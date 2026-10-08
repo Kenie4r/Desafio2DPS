@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
 } from 'react-native';
-import { useState } from 'react';
+import { useState , useEffect} from 'react';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import MovieCard from '@/components/MovieCard';
 import SeatMap from '@/components/SeatMap';
@@ -17,20 +17,20 @@ import { seleccionar } from '@/redux/slices/selectSalaSlice';
 import { iniciarReserva } from '@/redux/slices/reservaSlice';
 import type { Movie } from '@/types/pelicula';
 import { Ionicons } from '@expo/vector-icons';
+import { obtenerPeliculas } from '@/redux/slices/peliculasSlices';
+import { obtenerCategorias } from '@/redux/slices/categoriaSlice';
+
 
 export default function Cartelera() {
-  const movies = useAppSelector((s) => s.movie);
+  const capitalize = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
+  const movies =  useAppSelector((s) => s.movie);
   const salas = useAppSelector((s) => s.movieTheater);
   const selected = useAppSelector((s) => s.selectmovieTheather);
-  const moviesDisponibles = movies.filter((m) => m.status === 'Disponible');
+  const moviesDisponibles = movies.filter((m) => m.estado === 'ACTIVO');
   const d = useAppDispatch();
   const [movie, setMovie] = useState<Movie | null>(null);
-  const tiposPeliculas = [
-    'Todos',
-    ...new Set(moviesDisponibles.map((m) => m.genre)),
-  ];
-  const [selectedCategory, setSelectedCategory] = useState<String | null>(
-    'Todos',
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(
+    0,
   );
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,10 +53,19 @@ export default function Cartelera() {
     }
   };
 
+  const categorias = useAppSelector((s) => s.categoria);
+
+  const tiposPeliculas = [{ id: 0, descripcion: 'Todos' },...categorias,];
+  useEffect(() => {
+    void d(obtenerPeliculas()).unwrap().catch((error) => console.error(error));
+    void d(obtenerCategorias()).unwrap().catch((error) => console.error(error))
+  }, [d]);
+
+
   const filteredMovies = moviesDisponibles.filter(
     (m) =>
-      (selectedCategory === 'Todos' || selectedCategory === m.genre) &&
-      m.title.toLowerCase().includes(searchQuery.toLowerCase()),
+      (selectedCategory === 0 || selectedCategory === m.genero_id) &&
+      m.nombre.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -82,7 +91,7 @@ export default function Cartelera() {
               >
                 {filteredMovies
                   .filter((m) =>
-                    m.title.toLowerCase().includes(searchQuery.toLowerCase()),
+                    m.nombre.toLowerCase().includes(searchQuery.toLowerCase()),
                   )
                   .map((item) => (
                     <MovieCard
@@ -108,43 +117,41 @@ export default function Cartelera() {
         >
           {tiposPeliculas.map((cat) => (
             <TouchableOpacity
-              key={cat}
-              style={[st.button, selectedCategory === cat && st.activeButton]}
-              onPress={() => setSelectedCategory(cat)}
+              key={cat.id}
+              style={[st.button, selectedCategory === cat.id && st.activeButton]}
+              onPress={() => setSelectedCategory(cat.id)}
             >
               <Text
                 style={[
                   st.buttonText,
-                  selectedCategory === cat && st.activeButtonText,
+                  selectedCategory === cat.id && st.activeButtonText,
                 ]}
               >
-                {cat}
+                {capitalize(cat.descripcion)}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {filteredMovies.map((m) => (
-            <MovieCard key={m.id} movie={m} onPress={() => open(m)} />
-          ))}
-        </ScrollView>
+        <View style={st.movieGrid}>
+          
+              {filteredMovies.map((m) => (
+               <View style={st.movieItem}>
+               <MovieCard key={m.id} movie={m} categoria={tiposPeliculas.filter( c => c.id == m.genero_id)[0]}
+                onPress={() => open(m)} />
+                </View>
+              ))}
+          
+          
+        </View>
 
-        <Text style={st.h2}>Próximamente</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {movies
-            .filter((m) => m.status === 'Próximamente')
-            .map((m) => (
-              <MovieCard key={m.id} movie={m} onPress={() => setMovie(m)} />
-            ))}
-        </ScrollView>
       </ScrollView>
 
       <Modal visible={!!selected.movieId} animationType="slide">
         <View style={st.modal}>
           <View style={st.modalHead}>
             <Text style={st.modalTitle}>
-              {movie?.title} · Sala {selected.MovieTheaterNumber} ·{' '}
+              {movie?.nombre} · Sala {selected.MovieTheaterNumber} ·{' '}
               {selected.hour}
             </Text>
             <Pressable
@@ -282,4 +289,13 @@ const st = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
+  movieGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'space-between',
+  rowGap: 16,
+},
+movieItem: {
+  width: '48%',
+},
 });

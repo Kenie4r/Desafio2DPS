@@ -1,16 +1,9 @@
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Alert,
-  StyleSheet,
-  Image,
-} from 'react-native';
+import {View,Text,FlatList,TouchableOpacity,Alert,StyleSheet,Image,} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { deleteMovie, toggleStatus } from '@/redux/slices/peliculasSlices';
 import { removeTheatersForMovie } from '@/redux/slices/salasSlice';
+import { guardarPelicula } from '@/redux/slices/peliculasSlices';
 
 export default function AdminPeliculas() {
   const router = useRouter();
@@ -57,13 +50,13 @@ export default function AdminPeliculas() {
           <View style={st.card}>
             <View style={st.cardRow}>
               <Image
-                source={{ uri: item.image || 'https://placehold.co/120x160/png' }}
+                source={{ uri: item.url_image || 'https://placehold.co/120x160/png' }}
                 style={st.cardImage}
               />
               <View style={st.cardInfo}>
-                <Text style={st.cardTitle}>{item.title}</Text>
+                <Text style={st.cardTitle}>{item.nombre}</Text>
                 <Text style={st.cardSub}>
-                  {item.genre} · {item.duration} min · {item.clasificacion}
+                  {item.genero_id} · {item.duracion} min · {item.clasificacion}
                 </Text>
                 <Text style={st.cardSub}>Sala: {item.sala}</Text>
                 <Text style={st.cardSub}>
@@ -74,12 +67,12 @@ export default function AdminPeliculas() {
                     st.statusBadge,
                     {
                       backgroundColor:
-                        item.status === 'Disponible' ? '#dcfce7' : '#fee2e2',
-                      color: item.status === 'Disponible' ? '#166534' : '#991b1b',
+                        item.estado === 'Disponible' ? '#dcfce7' : '#fee2e2',
+                      color: item.estado === 'Disponible' ? '#166534' : '#991b1b',
                     },
                   ]}
                 >
-                  {item.status}
+                  {item.estado}
                 </Text>
               </View>
             </View>
@@ -93,15 +86,15 @@ export default function AdminPeliculas() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[st.actionBtn, st.toggleBtn]}
-                onPress={() => handleToggleStatus(item.id, item.status)}
+                onPress={() => handleToggleStatus(item.id, item.estado)}
               >
                 <Text style={st.actionText}>
-                  {item.status === 'Disponible' ? 'Ocultar' : 'Activar'}
+                  {item.estado === 'Disponible' ? 'Ocultar' : 'Activar'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[st.actionBtn, st.deleteBtn]}
-                onPress={() => handleDelete(item.id, item.title)}
+                onPress={() => handleDelete(item.id, item.nombre)}
               >
                 <Text style={st.actionText}>Eliminar</Text>
               </TouchableOpacity>

@@ -1,9 +1,10 @@
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { updateMovie } from '@/redux/slices/peliculasSlices';
 import MovieForm from '@/components/MovieForm';
 import type { Movie } from '@/types/pelicula';
+import { actualizarPelicula } from '@/redux/slices/peliculasSlices';
 
 export default function PeliculaEdit() {
   const router = useRouter();
@@ -19,9 +20,13 @@ export default function PeliculaEdit() {
     );
   }
 
-  const handleSubmit = (data: Omit<Movie, 'id'> & { id?: number }) => {
-    d(updateMovie({ ...data, id: movie.id }));
-    router.back();
+  const handleSubmit = async (data: Omit<Movie, 'id'> & { id?: number },) => {
+    try {
+      await d(actualizarPelicula({ ...data, id: movie.id }),).unwrap();
+      router.back();
+    } catch (error) {
+      Alert.alert('Error al actualizar',typeof error === 'string'? error: 'No se pudo actualizar la película',);
+    }
   };
 
   return (

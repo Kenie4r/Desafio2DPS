@@ -1,20 +1,31 @@
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert  } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppDispatch } from '@/redux/hooks';
 import { addMovie } from '@/redux/slices/peliculasSlices';
 import { addTheatersForMovie } from '@/redux/slices/salasSlice';
 import MovieForm from '@/components/MovieForm';
 import type { Movie } from '@/types/pelicula';
+import { guardarPelicula } from '@/redux/slices/peliculasSlices';
 
 export default function PeliculaAdd() {
   const router = useRouter();
   const d = useAppDispatch();
 
-  const handleSubmit = (data: Omit<Movie, 'id'> & { id?: number }) => {
-    d(addMovie({ ...data, id: undefined }));
-    d(addTheatersForMovie(Date.now()));
-    router.back();
+
+  const handleSubmit = async (data: Omit<Movie, 'id'> & { id?: number },) => {
+    const { id, ...pelicula } = data;
+    try {
+      await d(guardarPelicula(pelicula)).unwrap();
+      router.back();
+    } catch (error) {
+      Alert.alert('Error al guardar',typeof error === 'string'? error: 'No se pudo guardar la película',);
+    }
   };
+  /*const handleSubmit = (data: Omit<Movie, 'id'> & { id?: number }) => {
+    d(addMovie({ ...data, id: undefined }));
+   // d(addTheatersForMovie(Date.now()));
+    router.back();
+  };*/
 
   return (
     <ScrollView style={st.page} contentContainerStyle={st.content}>
