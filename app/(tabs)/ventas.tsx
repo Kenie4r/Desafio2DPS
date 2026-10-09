@@ -1,42 +1,96 @@
-import {
-  FlatList,
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import {FlatList,View,Text,StyleSheet,Modal,TouchableOpacity,ScrollView,Alert,} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
+
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { eliminarCompra } from '@/redux/slices/comprassSlice';
-import { liberarAsiento as liberarAsientoSeleccion } from '@/redux/slices/selectSalaSlice';
 import { liberarAsientoCompra } from '@/redux/slices/salasSlice';
-import type { ticketsBuy } from '@/types/reserva';
-import { useState } from 'react';
+import {cargarReservas,quitarReserva,} from '@/redux/slices/reservasAPISlice';
+import {serviceConsume} from '@/services/api';
+import type { ReservaAPI } from '@/types/reservaApi';
 
 export default function Ventas() {
-  const c = useAppSelector((s) => s.compras);
+  const reservas = useAppSelector((s) => s.reservasApi);
+  const comprasLocales = useAppSelector((s) => s.compras);
   const d = useAppDispatch();
-  const [qrVisible, setQrVisible] = useState(false);
-  const [qrItem, setQrItem] = useState<ticketsBuy | null>(null);
 
-  const openQr = (item: ticketsBuy) => {
+  const [cargando, setCargando] = useState(false);
+  const [qrItem, setQrItem] = useState<ReservaAPI | null>(null);
+  const [eliminandoId, setEliminandoId] = useState<number | null>(null);
+  const eliminando = useRef(false);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+
+    try {
+      const data = await serviceConsume.obtenerListadoReservas();
+      d(cargarReservas(data));
+
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'No se pudieron cargar las reservas.',
+      );
+    } finally {
+      setCargando(false);
+    }
+  }, [d]);
+
+  // Consulta nuevamente al entrar a esta pantalla.
+  useFocusEffect(
+    useCallback(() => {
+      void cargar();
+    }, [cargar]),
+  );
+
+  const openQr = (item: ReservaAPI) => {
+    if (!item.codigo_qr?.trim()) {
+      return Alert.alert('QR', 'Esta reserva no tiene código QR.');
+    }
+
     setQrItem(item);
-    setQrVisible(true);
   };
 
-  const deleteTicket = (item: ticketsBuy) => {
-    Alert.alert('Eliminar boleto', '¿Deseas eliminar esta compra?', [
+  const deleteTicket = (item: ReservaAPI) => {
+    if (eliminando.current) return;
+
+    Alert.alert('Eliminar boleto', '¿Deseas eliminar esta reserva?', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
         style: 'destructive',
-        onPress: () => {
-          item.seats.forEach((seat) => d(liberarAsientoSeleccion(seat)));
-          d(liberarAsientoCompra(item));
-          d(eliminarCompra(item.id ?? `${item.movieId}-${item.theatherId}-${item.hour ?? 'sin-hora'}-${item.seats.map((x) => x.name).join('|')}`));
+        onPress: async () => {
+          if (eliminando.current) return;
+
+          eliminando.current = true;
+          setEliminandoId(item.id);
+
+          try {
+            await serviceConsume.eliminarReserva(item.id);
+            d(quitarReserva(item.id));
+
+            const compraLocal = comprasLocales.find(
+              (compra) => compra.id === item.numero_reserva,
+            );
+
+            if (compraLocal) {
+              d(liberarAsientoCompra(compraLocal));
+              d(eliminarCompra(item.numero_reserva));
+            }
+
+            setQrItem((actual) => actual?.id === item.id ? null : actual);
+          } catch (error) {
+            Alert.alert(
+              'Error',
+              error instanceof Error
+                ? error.message
+                : 'No se pudo eliminar la reserva.',
+            );
+          } finally {
+            eliminando.current = false;
+            setEliminandoId(null);
+          }
         },
       },
     ]);
@@ -45,24 +99,40 @@ export default function Ventas() {
   return (
     <View style={st.page}>
       <Text style={st.h1}>Boletos vendidos</Text>
+
       <FlatList
-        data={c.slice().reverse()}
-        keyExtractor={(_, i) => String(i)}
-        ListEmptyComponent={<Text style={st.empty}>Aún no hay compras.</Text>}
+        data={reservas.slice().reverse()}
+        keyExtractor={(item) => String(item.id)}
+        refreshing={cargando}
+        onRefresh={cargar}
+        ListEmptyComponent={
+          <Text style={st.empty}>
+            {cargando ? 'Cargando reservas...' : 'Aún no hay compras.'}
+          </Text>
+        }
         renderItem={({ item }) => (
           <View style={st.card}>
             <View style={st.cardContent}>
-              <View>
-                <Text style={st.title}>Película #{item.movieId}</Text>
-                <Text>
-                  Sala: {item.theatherId} · Hora: {item.hour}
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={st.title}>
+                  Reserva #{item.numero_reserva}
                 </Text>
-                <Text>
-                  Asientos: {item.seats.map((x) => x.name).join(', ')}
+
+                <Text>Película #{item.pelicula_id}</Text>
+                <Text>Cliente: {item.nombre_cliente}</Text>
+                <Text>Documento: {item.documento}</Text>
+                <Text>Función: {item.funcion}</Text>
+                <Text>Boletos: {item.cantidad}</Text>
+
+                <Text style={st.price}>
+                  $ {item.total.toFixed(2)}
                 </Text>
-                <Text style={st.price}>$ {(item.price ?? 0).toFixed(2)}</Text>
-                <Text style={st.status}>Estado: {item.estado}</Text>
+
+                <Text style={st.status}>
+                  Estado: {item.utilizado === 1 ? 'Usada' : 'Sin utilizar'}
+                </Text>
               </View>
+
               <View style={st.actions}>
                 <TouchableOpacity
                   style={st.qrButton}
@@ -70,11 +140,15 @@ export default function Ventas() {
                 >
                   <Text style={st.qrButtonText}>Ver QR</Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={st.deleteButton}
+                  disabled={eliminandoId !== null}
                   onPress={() => deleteTicket(item)}
                 >
-                  <Text style={st.deleteButtonText}>Eliminar</Text>
+                  <Text style={st.deleteButtonText}>
+                    {eliminandoId === item.id ? 'Eliminando...' : 'Eliminar'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -83,40 +157,37 @@ export default function Ventas() {
       />
 
       <Modal
-        visible={qrVisible}
+        visible={qrItem !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setQrVisible(false)}
+        onRequestClose={() => setQrItem(null)}
       >
         <View style={st.modalOverlay}>
           <ScrollView contentContainerStyle={st.modalContent}>
-            <Text style={st.modalTitle}>Código QR por asiento</Text>
-            {qrItem &&
-              qrItem.seats.map((seat) => {
-                const seatOnlyQr = {
-                  ...qrItem,
-                  seats: [seat],
-                };
+            <Text style={st.modalTitle}>Código QR de la compra</Text>
 
-                return (
-                  <View key={seat.name} style={st.qrRow}>
-                    <QRCode
-                      value={JSON.stringify(seatOnlyQr)}
-                      size={150}
-                      backgroundColor="transparent"
-                      color="#000"
-                    />
-                    <Text style={st.qrSeatText}>
-                      Película #{qrItem.movieId} · Sala {qrItem.theatherId} ·{' '}
-                      {qrItem.hour} · Asiento {seat.name}
-                    </Text>
-                  </View>
-                );
-              })}
+            {qrItem && (
+              <View style={st.qrRow}>
+                <QRCode
+                  value={qrItem.codigo_qr}
+                  size={220}
+                  backgroundColor="#fff"
+                  color="#000"
+                />
+
+                <Text style={st.qrSeatText}>
+                  Reserva #{qrItem.numero_reserva}
+                  {'\n'}
+                  {qrItem.nombre_cliente}
+                  {'\n'}
+                  {qrItem.cantidad} boleto(s)
+                </Text>
+              </View>
+            )}
 
             <TouchableOpacity
               style={st.modalCloseBtn}
-              onPress={() => setQrVisible(false)}
+              onPress={() => setQrItem(null)}
             >
               <Text style={st.modalCloseText}>Cerrar</Text>
             </TouchableOpacity>
@@ -126,7 +197,6 @@ export default function Ventas() {
     </View>
   );
 }
-
 const st = StyleSheet.create({
   page: {
     flex: 1,

@@ -7,6 +7,7 @@ import selectmovieTheather from './slices/selectSalaSlice';
 import reservation from './slices/reservaSlice';
 import compras from './slices/comprassSlice';
 import categoria from './slices/categoriaSlice'
+import reservasApiReducer from './slices/reservasAPISlice';
 
 const rootReducer = combineReducers({
   movie,
@@ -15,6 +16,7 @@ const rootReducer = combineReducers({
   reservation,
   compras,
   categoria,
+  reservasApi: reservasApiReducer,
 });
 const persistedReducer = persistReducer(
   {

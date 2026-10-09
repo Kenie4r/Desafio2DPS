@@ -136,8 +136,8 @@ export default function Cartelera() {
         <View style={st.movieGrid}>
           
               {filteredMovies.map((m) => (
-               <View style={st.movieItem}>
-               <MovieCard key={m.id} movie={m} categoria={tiposPeliculas.filter( c => c.id == m.genero_id)[0]}
+               <View key={m.id} style={st.movieItem}>
+               <MovieCard  movie={m} categoria={tiposPeliculas.filter( c => c.id == m.genero_id)[0]}
                 onPress={() => open(m)} />
                 </View>
               ))}

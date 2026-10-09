@@ -3,22 +3,23 @@ import { useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { deleteMovie, toggleStatus } from '@/redux/slices/peliculasSlices';
 import { removeTheatersForMovie } from '@/redux/slices/salasSlice';
-import { guardarPelicula } from '@/redux/slices/peliculasSlices';
+import { eliminarPelicula } from '@/redux/slices/peliculasSlices';
+import { Movie } from '@/types/pelicula';
 
 export default function AdminPeliculas() {
   const router = useRouter();
   const movies = useAppSelector((s) => s.movie);
   const d = useAppDispatch();
 
-  const handleDelete = (id: number, title: string) => {
-    Alert.alert('Eliminar película', `¿Eliminar "${title}"?`, [
+  const handleDelete = (item : Movie) => {
+    Alert.alert('Eliminar película', `¿Eliminar "${item.nombre}"?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
         style: 'destructive',
         onPress: () => {
-          d(deleteMovie(id));
-          d(removeTheatersForMovie(id));
+          d(eliminarPelicula(item));
+          d(removeTheatersForMovie(item.id));
         },
       },
     ]);
@@ -84,17 +85,17 @@ export default function AdminPeliculas() {
               >
                 <Text style={st.actionText}>Editar</Text>
               </TouchableOpacity>
-              <TouchableOpacity
+            {/*  <TouchableOpacity
                 style={[st.actionBtn, st.toggleBtn]}
                 onPress={() => handleToggleStatus(item.id, item.estado)}
               >
                 <Text style={st.actionText}>
-                  {item.estado === 'Disponible' ? 'Ocultar' : 'Activar'}
+                  {item.estado === 'ACTIVO' ? 'Inactivar' : 'Activar'}
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity>*/}
               <TouchableOpacity
                 style={[st.actionBtn, st.deleteBtn]}
-                onPress={() => handleDelete(item.id, item.nombre)}
+                onPress={() => handleDelete(item)}
               >
                 <Text style={st.actionText}>Eliminar</Text>
               </TouchableOpacity>

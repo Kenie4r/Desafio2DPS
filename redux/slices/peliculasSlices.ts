@@ -28,7 +28,7 @@ export const obtenerPeliculas = createAsyncThunk<Movie[],void,{ rejectValue: str
   },
 );
 
-export const guardarPelicula = createAsyncThunk<Movie,Omit<Movie, 'id'>,{ rejectValue: string }>(
+export const guardarPelicula = createAsyncThunk<Movie,Omit<Movie, ''>,{ rejectValue: string }>(
   'movie/guardarPelicula',
   async (pelicula, { rejectWithValue }) => {
     try {
@@ -38,6 +38,22 @@ export const guardarPelicula = createAsyncThunk<Movie,Omit<Movie, 'id'>,{ reject
         error instanceof Error
           ? error.message
           : 'No se pudo guardar la película',
+      );
+    }
+  },
+);
+
+
+export const eliminarPelicula = createAsyncThunk<Movie,Omit<Movie, 'codigo_pelicula'>,{ rejectValue: string }>(
+  'movie/eliminarPelicula',
+  async (pelicula, { rejectWithValue }) => {
+    try {
+      return await serviceConsume.eliminarPelicula(pelicula.id);
+    } catch (error) {
+      return rejectWithValue(
+        error instanceof Error
+          ? error.message
+          : 'No se pudo eliminar la película',
       );
     }
   },
@@ -104,6 +120,10 @@ const slice = createSlice({
     })
     .addCase(actualizarPelicula.fulfilled, (state, action) => {  const pelicula = action.payload;
                                                                 const index = state.findIndex((m) => m.id === pelicula.id);
+                                                                if (index >= 0) { state[index] = { ...state[index],...pelicula,};}})
+    .addCase(eliminarPelicula.fulfilled, (state, action) => {  const pelicula = action.payload;
+                                                                const index = state.findIndex((m) => m.id != pelicula.id);
+                                                                state = [];
                                                                 if (index >= 0) { state[index] = { ...state[index],...pelicula,};}});
   },
 });
