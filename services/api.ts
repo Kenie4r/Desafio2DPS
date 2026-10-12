@@ -1,7 +1,6 @@
 import { Movie } from "@/types/pelicula";
 import type { NuevaReserva, ReservaAPI } from '@/types/reservaApi';
 
-// Lee respuestas JSON y muestra los errores de validación de tu backend.
 async function leerRespuestaReserva(response: Response) {
     const texto = await response.text();
     let resultado: any = null;
@@ -92,7 +91,7 @@ export const serviceConsume = {
 
         return resultJson; 
     },
-    guardarPelicula : async(req : Movie)=>{ 
+    guardarPelicula : async(req : Omit<Movie, 'id'>)=>{ 
         let url = URL_API_RAILWAY +'/peliculas';
 
         const response = await fetch(url,{
@@ -235,6 +234,15 @@ export const serviceConsume = {
         }
 
         return creada;
+    },
+
+    validarBoleto: async (codigoReserva: string): Promise<ReservaAPI> => {
+        const response = await fetch(
+            URL_API_RAILWAY + '/reservas/' + encodeURIComponent(codigoReserva) + '/validar',
+            { method: 'PUT' },
+        );
+        const resultado = await leerRespuestaReserva(response);
+        return normalizarReserva(resultado.reserva);
     },
 
     actualizarReserva: async (

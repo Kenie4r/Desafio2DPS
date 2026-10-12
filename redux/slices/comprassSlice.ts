@@ -6,6 +6,7 @@ const generateTicketId = (purchase: ticketsBuy) => {
   return `${purchase.movieId}-${purchase.theatherId}-${purchase.hour ?? 'sin-hora'}-${seats}-${Date.now()}-${Math.round(Math.random() * 100000)}`;
 };
 
+
 const slice = createSlice({
   name: 'compras',
   initialState: [] as ticketsBuy[],
@@ -27,6 +28,13 @@ const slice = createSlice({
       );
       if (index >= 0) {
         s.splice(index, 1);
+      }
+    },
+    marcarReservaComoUsada: (state, action: PayloadAction<string>) => {
+      const compra = state.find((item) => item.id === action.payload);
+      if (compra) {
+        compra.estado = 'usada';
+        compra.seats.forEach((asiento) => { asiento.status = 'usada'; });
       }
     },
     marcarComoUsada: (
@@ -67,5 +75,5 @@ const slice = createSlice({
   },
 });
 
-export const { agregarCompra, eliminarCompra, marcarComoUsada } = slice.actions;
+export const { agregarCompra, eliminarCompra, marcarComoUsada, marcarReservaComoUsada } = slice.actions;
 export default slice.reducer;

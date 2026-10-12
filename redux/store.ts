@@ -22,7 +22,7 @@ const persistedReducer = persistReducer(
   {
     key: 'root',
     storage: AsyncStorage,
-    whitelist: ['movie', 'movieTheater', 'compras'],
+    whitelist: ['movie', 'movieTheater', 'compras', 'reservasApi'],
   },
   rootReducer,
 );
@@ -47,4 +47,3 @@ export const store = configureStore({
 export const persistor = persistStore(store);
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
-// YA NO uses export default store;

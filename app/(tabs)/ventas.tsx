@@ -19,6 +19,7 @@ export default function Ventas() {
   const [qrItem, setQrItem] = useState<ReservaAPI | null>(null);
   const [eliminandoId, setEliminandoId] = useState<number | null>(null);
   const eliminando = useRef(false);
+  const boletoQR = reservas.find((item) => item.id === qrItem?.id) ?? qrItem;
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -166,21 +167,23 @@ export default function Ventas() {
           <ScrollView contentContainerStyle={st.modalContent}>
             <Text style={st.modalTitle}>Código QR de la compra</Text>
 
-            {qrItem && (
+            {boletoQR && (
               <View style={st.qrRow}>
                 <QRCode
-                  value={qrItem.codigo_qr}
+                  value={boletoQR.codigo_qr}
                   size={220}
                   backgroundColor="#fff"
                   color="#000"
                 />
 
                 <Text style={st.qrSeatText}>
-                  Reserva #{qrItem.numero_reserva}
+                  Reserva #{boletoQR.numero_reserva}
                   {'\n'}
-                  {qrItem.nombre_cliente}
+                  {boletoQR.nombre_cliente}
                   {'\n'}
-                  {qrItem.cantidad} boleto(s)
+                  {boletoQR.cantidad} boleto(s)
+                  {'\n'}
+                  Estado: {boletoQR.utilizado === 1 ? 'Utilizado' : 'Pendiente'}
                 </Text>
               </View>
             )}

@@ -1,8 +1,8 @@
 import { Pressable, Image, Text, StyleSheet, View } from 'react-native';
 import type { Movie } from '@/types/pelicula';
 import { Categoria } from '@/types/categoria';
-export default function MovieCard({movie,categoria,onPress,}: {movie: Movie; categoria : Categoria;onPress: () => void;}) {
-  const capitalize = (texto) =>texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
+export default function MovieCard({movie,categoria,onPress,}: {movie: Movie; categoria?: Categoria;onPress: () => void;}) {
+  const capitalize = (texto: string) =>texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
   return (
     <Pressable onPress={onPress} style={s.card}>
       <Image source={{ uri: movie.url_image }} style={s.image} />

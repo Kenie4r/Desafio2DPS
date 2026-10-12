@@ -1,101 +1,83 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
-import { marcarComoUsada } from '@/redux/slices/comprassSlice';
-import type { ticketsBuy } from '@/types/reserva';
+import { marcarReservaComoUsada } from '@/redux/slices/comprassSlice';
+import { guardarReserva } from '@/redux/slices/reservasAPISlice';
+import type { ReservaAPI, DatosQR } from '@/types/reservaApi';
+import { serviceConsume } from '@/services/api';
+
+function leerQR(codigo: string): DatosQR | null {
+  try {
+    let datos = JSON.parse(codigo);
+    if (typeof datos === 'string') datos = JSON.parse(datos);
+    return datos && Array.isArray(datos.asientos) ? datos : null;
+  } catch { return null; }
+}
 
 export default function Scanner() {
   const [permission, requestPermission] = useCameraPermissions();
-  const [scannedData, setScannedData] = useState<ticketsBuy | null>(null);
-  const c = useAppSelector((s) => s.compras);
+  const [reserva, setReserva] = useState<ReservaAPI | null>(null);
+  const [escaneado, setEscaneado] = useState(false);
+  const [procesando, setProcesando] = useState(false);
+  const bloqueo = useRef(false);
+  const movies = useAppSelector((s) => s.movie);
   const d = useAppDispatch();
+  const movie = movies.find((m) => m.id === reserva?.pelicula_id);
+  const datosQR = reserva ? leerQR(reserva.codigo_qr) : null;
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
+    if (bloqueo.current) return;
+    bloqueo.current = true;
+    setEscaneado(true);
+    setProcesando(true);
     try {
-      const parsed = JSON.parse(data) as ticketsBuy;
-      if (!Array.isArray(parsed.seats) || parsed.seats.length === 0) {
-        Alert.alert('Error', 'El QR no contiene un asiento válido.');
-        return;
+      const datos = leerQR(data);
+      const reservas = await serviceConsume.obtenerListadoReservas();
+      const coincidencias = reservas.filter((item) => {
+        if (item.codigo_qr === data) return true;
+        const almacenado = leerQR(item.codigo_qr);
+        if (!datos || !almacenado) return false;
+        if (datos.numero_reserva) return item.numero_reserva === datos.numero_reserva;
+        // JSON puede venir con otro orden de propiedades desde MySQL.
+        return !almacenado.numero_reserva &&
+          Number(almacenado.cod_pelicula) === Number(datos.cod_pelicula) &&
+          JSON.stringify(almacenado.asientos.map((s) => s.name).sort()) ===
+          JSON.stringify(datos.asientos.map((s) => s.name).sort());
+      });
+      if (coincidencias.length === 0) throw new Error('Este boleto no existe en la API.');
+      if (coincidencias.length > 1) {
+        throw new Error('Este QR antiguo corresponde a varias reservas. No se puede identificar un boleto único.');
       }
-
-      setScannedData(parsed);
-    } catch {
-      Alert.alert('Error', 'El código QR escaneado no es válido.');
-    }
+      setReserva(coincidencias[0]);
+      d(guardarReserva(coincidencias[0]));
+    } catch (error) {
+      Alert.alert('No se pudo consultar el boleto', error instanceof Error ? error.message : 'Intenta de nuevo.');
+    } finally { setProcesando(false); }
   };
 
-  const handleValidate = () => {
-    if (!scannedData) return;
-
-    const seatName = scannedData.seats[0]?.name;
-    if (!seatName) {
-      Alert.alert('QR inválido', 'Este código QR no tiene asiento asociado.');
-      return;
-    }
-
-    const compra = c.find(
-      (x) =>
-        x.movieId === scannedData.movieId &&
-        x.theatherId === scannedData.theatherId &&
-        x.hour === scannedData.hour &&
-        x.seats.some((s) => s.name === seatName),
-    );
-
-    if (!compra) {
-      Alert.alert('No encontrada', 'Esta compra no existe en el sistema.');
-      return;
-    }
-
-    if (compra.estado === 'cancelada') {
-      Alert.alert(
-        'Boleto cancelado',
-        'Este boleto fue cancelado y el asiento fue habilitado para otra persona.',
-      );
-      return;
-    }
-
-    const asiento = compra.seats.find((s) => s.name === seatName);
-    if (!asiento) {
-      Alert.alert('No encontrada', 'Este asiento no existe en la compra.');
-      return;
-    }
-
-    if (compra.estado === 'usada' || asiento.status === 'usada') {
-      Alert.alert(
-        'Boleto ya validado',
-        'Este boleto o asiento ya fue utilizado. No se permite el ingreso.',
-      );
-      return;
-    }
-
-    const detalle = `Película #${compra.movieId} · Sala ${compra.theatherId} · ${compra.hour}\nAsiento: ${asiento.name}\nPrecio: $${compra.price.toFixed(2)}`;
-
-    Alert.alert('Validar boleto', detalle, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Marcar como usado',
-        style: 'default',
-        onPress: () => {
-          d(
-            marcarComoUsada({
-              movieId: compra.movieId,
-              theatherId: compra.theatherId,
-              hour: compra.hour,
-              seatName,
-            }),
-          );
-          Alert.alert('Éxito', 'Boleto validado y marcado como utilizado.');
-          setScannedData(null);
-        },
-      },
-    ]);
+  const handleValidate = async () => {
+    if (!reserva || procesando) return;
+    setProcesando(true);
+    try {
+      // El servidor decide si es válido y cambia el estado de forma atómica.
+      const actualizada = await serviceConsume.validarBoleto(reserva.numero_reserva);
+      setReserva(actualizada);
+      d(guardarReserva(actualizada));
+      d(marcarReservaComoUsada(actualizada.numero_reserva));
+      Alert.alert('Boleto válido', 'Entrada registrada. El boleto quedó utilizado.');
+    } catch (error) {
+      Alert.alert('Validación del boleto', error instanceof Error ? error.message : 'No se pudo validar el boleto.');
+      try {
+        const actualizada = await serviceConsume.obtenerReserva(reserva.id);
+        setReserva(actualizada);
+        d(guardarReserva(actualizada));
+        if (actualizada.utilizado === 1) d(marcarReservaComoUsada(actualizada.numero_reserva));
+      } catch {  }
+    } finally { setProcesando(false); }
   };
 
-  if (!permission) {
-    return <View style={st.container} />;
-  }
-
+  if (!permission) return <View style={st.container} />;
   if (!permission.granted) {
     return (
       <View style={st.container}>
@@ -106,38 +88,38 @@ export default function Scanner() {
       </View>
     );
   }
-
   return (
     <View style={st.container}>
       <CameraView
         style={st.camera}
-        onBarcodeScanned={handleBarCodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ['qr'],
-        }}
+        onBarcodeScanned={escaneado ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
       />
-
-      {scannedData && (
+      {escaneado && (
         <View style={st.resultPanel}>
-          <Text style={st.resultTitle}>Boleto escaneado</Text>
-          <Text style={st.resultText}>
-            Película #{scannedData.movieId} · Sala {scannedData.theatherId}
-          </Text>
-          <Text style={st.resultText}>Hora: {scannedData.hour}</Text>
-          <Text style={st.resultText}>
-            Asientos: {scannedData.seats.map((s) => s.name).join(', ')}
-          </Text>
-          <Text style={st.resultText}>
-            Total: $ {(scannedData.price ?? 0).toFixed(2)}
-          </Text>
-          <Text style={st.resultText}>Estado: {scannedData.estado}</Text>
-
-          <TouchableOpacity style={st.validateBtn} onPress={handleValidate}>
-            <Text style={st.validateBtnText}>Validar Boleto</Text>
-          </TouchableOpacity>
+          <Text style={st.resultTitle}>{procesando ? 'Consultando API...' : 'Boleto escaneado'}</Text>
+          {reserva && (
+            <>
+              <Text style={st.resultText}>Reserva #{reserva.numero_reserva}</Text>
+              <Text style={st.resultText}>{movie?.nombre ?? `Película #${reserva.pelicula_id}`} · Sala {movie?.sala ?? '—'}</Text>
+              <Text style={st.resultText}>Cliente: {reserva.nombre_cliente}</Text>
+              <Text style={st.resultText}>Función: {reserva.funcion}</Text>
+              <Text style={st.resultText}>Asientos: {datosQR?.asientos.map((s) => s.name).join(', ') ?? '—'}</Text>
+              <Text style={st.resultText}>Total: $ {reserva.total.toFixed(2)}</Text>
+              <Text style={st.resultText}>Estado: {reserva.utilizado === 1 ? 'Utilizado' : 'Pendiente'}</Text>
+              <TouchableOpacity
+                style={[st.validateBtn, (procesando || reserva.utilizado === 1) && { opacity: 0.5 }]}
+                onPress={handleValidate}
+                disabled={procesando || reserva.utilizado === 1}
+              >
+                <Text style={st.validateBtnText}>{reserva.utilizado === 1 ? 'Boleto ya utilizado' : 'Validar boleto'}</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <TouchableOpacity
-            style={st.cancelBtn}
-            onPress={() => setScannedData(null)}
+            style={[st.cancelBtn, procesando && { opacity: 0.5 }]}
+            disabled={procesando}
+            onPress={() => { setReserva(null); setEscaneado(false); bloqueo.current = false; }}
           >
             <Text style={st.cancelBtnText}>Escanear otro</Text>
           </TouchableOpacity>

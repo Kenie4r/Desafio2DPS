@@ -28,7 +28,7 @@ export const obtenerPeliculas = createAsyncThunk<Movie[],void,{ rejectValue: str
   },
 );
 
-export const guardarPelicula = createAsyncThunk<Movie,Omit<Movie, ''>,{ rejectValue: string }>(
+export const guardarPelicula = createAsyncThunk<Movie,Omit<Movie, 'id'>,{ rejectValue: string }>(
   'movie/guardarPelicula',
   async (pelicula, { rejectWithValue }) => {
     try {

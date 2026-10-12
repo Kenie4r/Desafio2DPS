@@ -79,7 +79,7 @@ export default function AdminIndex() {
       <View style={st.section}>
         <Text style={st.h2}>Película más reservada</Text>
         <Text style={st.movieTitle}>
-          {topMovie ? topMovie.title : 'Sin reservas'}
+          {topMovie ? topMovie.nombre : 'Sin reservas'}
         </Text>
       </View>
 

@@ -7,6 +7,7 @@ import { cerrarAsiento, seleccionar } from '@/redux/slices/selectSalaSlice';
 import { syncSelectedTheater } from '@/redux/slices/salasSlice';
 import { guardarReserva } from '@/redux/slices/reservasAPISlice';
 import { serviceConsume } from '@/services/api';
+import { notificarCompra } from '@/services/notificaciones';
 import type { DatosQR } from '@/types/reservaApi';
 
 export default function BuyPanel() {
@@ -82,6 +83,7 @@ export default function BuyPanel() {
       const total = Number((r.seats.length * precioUnitario).toFixed(2));
 
       const datosQR: DatosQR = {
+        numero_reserva: numeroReserva,
         asientos: r.seats.map((seat) => ({ ...seat })),
         cod_pelicula: r.movieId,
       };
@@ -98,10 +100,10 @@ export default function BuyPanel() {
         utilizado: 0,
       });
 
-      // La reserva del servidor queda disponible inmediatamente en el listado.
+      
       d(guardarReserva(reserva));
 
-      // Conserva tu manejo local de compras y asientos.
+      
       d(
         agregarCompra({
           ...r,
@@ -144,7 +146,17 @@ export default function BuyPanel() {
       setDocumento('');
       
 
-      Alert.alert('Compra realizada', 'Tu reserva fue guardada correctamente.');
+      try {
+        await notificarCompra({
+          pelicula: movie?.nombre ?? `Película #${reserva.pelicula_id}`,
+          cantidad: reserva.cantidad,
+          asientos: datosQR.asientos.map((asiento) => asiento.name),
+          total: reserva.total,
+          codigo: reserva.numero_reserva,
+        });
+      } catch (error) {
+        console.warn('La compra fue guardada, pero no se pudo notificar:', error);
+      }
     } catch (error) {
       Alert.alert(
         'Error',

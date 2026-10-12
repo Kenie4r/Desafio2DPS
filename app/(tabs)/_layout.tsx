@@ -1,45 +1,24 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
+import { configurarNotificaciones } from '@/services/notificaciones';
+import { Stack } from 'expo-router';
+import { Provider } from 'react-redux';
+import { store, persistor } from '@/redux/store'; 
+import { PersistGate } from 'redux-persist/integration/react';
+import { StatusBar } from 'expo-status-bar';
+
 export default function Layout() {
+  useEffect(() => {
+    void configurarNotificaciones().catch((error) => {
+      console.warn('No se pudieron configurar las notificaciones:', error);
+    });
+  }, []);
+
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#166534',
-        tabBarStyle: { height: 68, paddingBottom: 8, paddingTop: 6 },
-      }}
-    >
-      <Tabs.Screen
-        name="cartelera"
-        options={{
-          title: 'Cartelera',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="film-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="ventas"
-        options={{
-          title: 'Boletos',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="ticket-outline" color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="administrar"
-        options={{
-          title: 'Administrar',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons
-              name="shield-checkmark-outline"
-              color={color}
-              size={size}
-            />
-          ),
-        }}
-      />
-    </Tabs>
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </PersistGate>
+    </Provider>
   );
 }

@@ -22,7 +22,7 @@ import { obtenerCategorias } from '@/redux/slices/categoriaSlice';
 
 
 export default function Cartelera() {
-  const capitalize = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
+  const capitalize = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
   const movies =  useAppSelector((s) => s.movie);
   const salas = useAppSelector((s) => s.movieTheater);
   const selected = useAppSelector((s) => s.selectmovieTheather);
@@ -97,6 +97,7 @@ export default function Cartelera() {
                     <MovieCard
                       key={item.id}
                       movie={item}
+                      categoria={categorias.find((cat) => cat.id === item.genero_id)}
                       onPress={() => {
                         setMovie(item);
                         setShowSearch(false);

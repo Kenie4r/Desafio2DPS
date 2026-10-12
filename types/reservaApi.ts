@@ -1,6 +1,7 @@
 import type { Seat } from '@/types/asiento';
 
 export type DatosQR = {
+  numero_reserva?: string;
   asientos: Seat[];
   cod_pelicula: number;
 };
